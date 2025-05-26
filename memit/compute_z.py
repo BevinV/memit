@@ -245,7 +245,7 @@ def get_module_input_output_at_words(
     l_input = inp_tensor[range(batch_size), safe_idxs, :].detach()
     l_output = out_tensor[range(batch_size), safe_idxs, :].detach()
 
-
+    return l_input, l_output
 
 
 def find_fact_lookup_idx(
