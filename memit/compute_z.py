@@ -198,42 +198,50 @@ def get_module_input_output_at_words(
     words: List[str],
     module_template: str,
     fact_token_strategy: str,
-) -> Tuple[torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Retrieves detached representations for a word at the input and
-    output of a particular layer module.
+    output of a particular layer module, given fully‐formatted contexts.
     """
 
-    word_repr_args = dict(
-        model=model,
-        tok=tok,
-        layer=layer,
-        module_template=module_template,
-    )
-    if "subject_" in fact_token_strategy and fact_token_strategy.index("subject_") == 0:
-        context_info = dict(
-            context_templates=context_templates,
-            words=words,
-        )
-        subtoken = fact_token_strategy[len("subject_") :]
-        l_input, l_output = repr_tools.get_reprs_at_word_tokens(
-            track="both", subtoken=subtoken, **context_info, **word_repr_args
-        )
-    elif fact_token_strategy == "last":
-        raise Exception("This is definitely bugged, fix it.")
-        context_info = dict(
-            contexts=[
-                tmp[i].format(words[i]) for i, tmp in enumerate(context_templates)
-            ],
-            idxs=[000000],
-        )
-        l_input, l_output = repr_tools.get_reprs_at_idxs(
-            track="both", **context_info, **word_repr_args
-        )
-    else:
-        raise ValueError(f"fact_token={fact_token_strategy} not recognized")
+    # Build the layer name
+    layer_name = module_template.format(layer)
 
-    return l_input.detach(), l_output.detach()
+    # Tokenize all prompts at once (no special tokens)
+    tok_out = tok(context_templates, return_tensors="pt", padding=True, add_special_tokens=False)
+    input_ids = tok_out["input_ids"].to(model.device)
+    attention_mask = tok_out["attention_mask"].to(model.device)
+
+    # Find subject lookup indices for each prompt
+    lookup_idxs = [
+        find_fact_lookup_idx(prompt, subject, tok, fact_token_strategy, verbose=(i == 0))
+        for i, (prompt, subject) in enumerate(zip(context_templates, words))
+    ]
+
+    # Run a single forward to grab input/output at that layer
+    with nethook.TraceDict(
+        module=model,
+        layers=[layer_name],
+        retain_input=True,
+        retain_output=True,
+    ) as tr:
+        _ = model(input_ids=input_ids, attention_mask=attention_mask).logits
+
+    # Extract input and output representations
+    reps = tr[layer_name]
+    # reps.input and reps.output have shape [batch, seq_len, hidden]
+    batch_size, seq_len, hidden = reps.input.shape
+
+    # Clamp indices to seq_len-1
+    safe_idxs = [min(idx, seq_len - 1) for idx in lookup_idxs]
+
+    # Gather the vectors at each index
+    # Shape will be [batch, hidden]
+    l_input = reps.input[range(batch_size), safe_idxs, :].detach()
+    l_output = reps.output[range(batch_size), safe_idxs, :].detach()
+
+    return l_input, l_output
+
 
 
 def find_fact_lookup_idx(
