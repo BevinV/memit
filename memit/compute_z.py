@@ -228,19 +228,23 @@ def get_module_input_output_at_words(
         _ = model(input_ids=input_ids, attention_mask=attention_mask).logits
 
     # Extract input and output representations
+        # Extract input and output representations
     reps = tr[layer_name]
-    # reps.input and reps.output have shape [batch, seq_len, hidden]
-    batch_size, seq_len, hidden = reps.input.shape
+
+    # Unpack in case input/output are tuples
+    inp_tensor = reps.input[0] if isinstance(reps.input, tuple) else reps.input
+    out_tensor = reps.output[0] if isinstance(reps.output, tuple) else reps.output
+
+    # inp_tensor/out_tensor have shape [batch, seq_len, hidden]
+    batch_size, seq_len, hidden = inp_tensor.shape
 
     # Clamp indices to seq_len-1
     safe_idxs = [min(idx, seq_len - 1) for idx in lookup_idxs]
 
-    # Gather the vectors at each index
-    # Shape will be [batch, hidden]
-    l_input = reps.input[range(batch_size), safe_idxs, :].detach()
-    l_output = reps.output[range(batch_size), safe_idxs, :].detach()
+    # Gather the vectors at each index (shape [batch, hidden])
+    l_input = inp_tensor[range(batch_size), safe_idxs, :].detach()
+    l_output = out_tensor[range(batch_size), safe_idxs, :].detach()
 
-    return l_input, l_output
 
 
 
