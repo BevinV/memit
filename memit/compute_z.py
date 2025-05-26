@@ -240,29 +240,28 @@ def find_fact_lookup_idx(
     verbose=True,
 ) -> int:
     """
-    Computes hypothesized fact lookup index given a sentence and subject.
+    Computes hypothesized fact lookup index given a fully-formatted sentence
+    and the subject string, by finding the subject's token span.
     """
 
-    ret = None
-    if fact_token_strategy == "last":
-        ret = -1
-    elif (
-        "subject_" in fact_token_strategy and fact_token_strategy.index("subject_") == 0
-    ):
-        ret = repr_tools.get_words_idxs_in_templates(
-            tok=tok,
-            context_templates=[prompt],
-            words=[subject],
-            subtoken=fact_token_strategy[len("subject_") :],
-        )[0][0]
-    else:
-        raise ValueError(f"fact_token={fact_token_strategy} not recognized")
+    # Tokenize the full prompt (no special tokens)
+    input_ids = tok(prompt, return_tensors="pt", add_special_tokens=False)[
+        "input_ids"
+    ][0].tolist()
+    # Tokenize the subject (no special tokens)
+    subj_ids = tok(subject, return_tensors="pt", add_special_tokens=False)[
+        "input_ids"
+    ][0].tolist()
 
-    sentence = prompt.format(subject)
-    if verbose:
-        print(
-            f"Lookup index found: {ret} | Sentence: {sentence} | Token:",
-            tok.decode(tok(sentence)["input_ids"][ret]),
-        )
+    # Find the first occurrence of subj_ids in input_ids
+    for i in range(len(input_ids) - len(subj_ids) + 1):
+        if input_ids[i : i + len(subj_ids)] == subj_ids:
+            idx = i + len(subj_ids) - 1
+            if verbose:
+                tok_str = tok.decode([input_ids[idx]])
+                print(f"Lookup index found: {idx} | Prompt: {prompt!r} | Token: {tok_str!r}")
+            return idx
 
-    return ret
+    raise AssertionError(
+        f"Could not find subject tokens {subj_ids} inside prompt tokens {input_ids}"
+    )
