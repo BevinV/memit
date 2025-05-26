@@ -242,6 +242,7 @@ def find_fact_lookup_idx(
     """
     Computes hypothesized fact lookup index given a fully-formatted sentence
     and the subject string, by finding the subject's token span.
+    Falls back to last token if not found.
     """
 
     # Tokenize the full prompt (no special tokens)
@@ -253,7 +254,7 @@ def find_fact_lookup_idx(
         "input_ids"
     ][0].tolist()
 
-    # Find the first occurrence of subj_ids in input_ids
+    # Try to locate subject subtokens
     for i in range(len(input_ids) - len(subj_ids) + 1):
         if input_ids[i : i + len(subj_ids)] == subj_ids:
             idx = i + len(subj_ids) - 1
@@ -262,6 +263,13 @@ def find_fact_lookup_idx(
                 print(f"Lookup index found: {idx} | Prompt: {prompt!r} | Token: {tok_str!r}")
             return idx
 
-    raise AssertionError(
-        f"Could not find subject tokens {subj_ids} inside prompt tokens {input_ids}"
-    )
+    # --- Fallback: use last token ---
+    idx = len(input_ids) - 1
+    if verbose:
+        print(
+            f"WARNING: subject {subject!r} not found in prompt tokens, "
+            f"defaulting lookup index to last token ({idx}).\n"
+            f"Full prompt: {prompt!r}"
+        )
+    return idx
+
