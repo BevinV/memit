@@ -82,6 +82,7 @@ def compute_z(
     if hidden_size is None:
         raise AttributeError("Model config has neither 'n_embd' nor 'hidden_size'")
     delta = torch.zeros((hidden_size,), requires_grad=True, device="cuda")
+    target_init, kl_distr_init = None, None
 
     # Inserts new "delta" variable at the appropriate part of the computation
     def edit_output_fn(cur_out, cur_layer):
