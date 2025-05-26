@@ -89,18 +89,22 @@ def compute_z(
         nonlocal target_init
 
         if cur_layer == hparams.layer_module_tmp.format(layer):
+            # cur_out[0] has shape [batch_size, seq_len, hidden]
+            seq_len = cur_out[0].shape[1]
+
             # Store initial value of the vector of interest
             if target_init is None:
+                # clamp first index too
+                safe_idx0 = min(lookup_idxs[0], seq_len - 1)
                 print("Recording initial value of v*")
-                # Initial value is recorded for the clean sentence
-                target_init = cur_out[0][0, lookup_idxs[0]].detach().clone()
+                target_init = cur_out[0][0, safe_idx0].detach().clone()
 
-            # Add intervened delta
-            for i, idx in enumerate(lookup_idxs):
-                cur_out[0][i, idx, :] += delta
+            # Add intervened delta, clamping each idx
+            for i, raw_idx in enumerate(lookup_idxs):
+                safe_idx = min(raw_idx, seq_len - 1)
+                cur_out[0][i, safe_idx, :] += delta
 
         return cur_out
-
     # Optimizer
     opt = torch.optim.Adam([delta], lr=hparams.v_lr)
     nethook.set_requires_grad(False, model)
