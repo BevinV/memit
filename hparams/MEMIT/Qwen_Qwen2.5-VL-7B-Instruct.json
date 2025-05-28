@@ -17,6 +17,6 @@
     "ln_f_module": "model.language_model.norm",
     "lm_head_module": "lm_head",
     "mom2_dataset": "wikipedia",
-    "mom2_n_samples": 50000,
+    "mom2_n_samples": 10000,
     "mom2_dtype": "float16"
 }
