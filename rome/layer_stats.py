@@ -104,7 +104,7 @@ def layer_stats(
         return TokenizedDataset(raw_ds["train"], tokenizer, maxlen=maxlen)
 
     # Continue with computation of statistics
-    batch_size = 4  # Examine this many dataset texts at once
+    batch_size = 1  # Examine this many dataset texts at once
     npos = model.config.n_positions
     if batch_tokens is None:
         batch_tokens = npos * 3  # Sort and divide into batches with this many tokens
